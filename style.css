@@ -36,3 +36,144 @@ body {
 #change-button:hover {
     background-color: #0056b3;
 }
+// [既存の定数に追加]
+const BUBBLE_RADIUS = 15;
+const BUBBLE_DIAMETER = BUBBLE_RADIUS * 2;
+const GRID_ROWS = 20; // グリッドの最大行数
+const GRID_COLS = 8;  // グリッドの最大列数 (偶数)
+
+// ----------------------------------------------------
+// [新しく追加]
+let grid = []; // バブルを格納する二次元配列 (グリッド)
+// ----------------------------------------------------
+
+// グリッドの初期化関数
+function initializeGrid() {
+    for (let i = 0; i < GRID_ROWS; i++) {
+        grid[i] = new Array(GRID_COLS).fill(null); // nullで埋める
+    }
+}
+
+// ゲーム初期化時にグリッドも初期化する
+function initializeGame() {
+    initializeGrid(); // <-- 追加
+    // ... (既存の setupInitialBubbles, spawnNewBubble など) ...
+}
+/**
+ * グリッド座標 (row, col) から、描画用のピクセル座標 (x, y) を計算する
+ * @param {number} row 行インデックス
+ * @param {number} col 列インデックス
+ * @returns {{x: number, y: number}} ピクセル座標
+ */
+function getPixelCoords(row, col) {
+    // 垂直方向の間隔 (正三角形の高さ * 1.5)
+    const rowSpacing = BUBBLE_DIAMETER * Math.sqrt(3) / 2;
+    const y = row * rowSpacing + BUBBLE_RADIUS;
+
+    // 水平方向の間隔
+    let x = col * BUBBLE_DIAMETER + BUBBLE_RADIUS;
+
+    // 奇数行の場合、半分の直径分を右にずらす (オフセット)
+    if (row % 2 !== 0) {
+        x += BUBBLE_RADIUS; // BUBBLE_DIAMETER / 2
+    }
+
+    // 画面中央に寄せるための調整（必要に応じて）
+    const totalWidth = GRID_COLS * BUBBLE_DIAMETER + (GRID_COLS % 2 !== 0 ? BUBBLE_RADIUS : 0);
+    const offsetX = (CANVAS_WIDTH - totalWidth) / 2 + BUBBLE_RADIUS; 
+    
+    return { x: x, y: y };
+}
+
+
+/**
+ * ピクセル座標 (x, y) から、最も近いグリッド座標 (row, col) を計算する
+ * (これが、発射されたバブルを固定する際のスナップ処理になります)
+ * @param {number} x ピクセルX座標
+ * @param {number} y ピクセルY座標
+ * @returns {{row: number, col: number}} グリッド座標
+ */
+function getGridCoords(x, y) {
+    const rowSpacing = BUBBLE_DIAMETER * Math.sqrt(3) / 2;
+    
+    // 行の計算
+    let row = Math.round((y - BUBBLE_RADIUS) / rowSpacing);
+    if (row < 0) row = 0;
+    if (row >= GRID_ROWS) row = GRID_ROWS - 1;
+
+    // 水平方向の調整 (オフセットの逆算)
+    let adjustedX = x - BUBBLE_RADIUS;
+    if (row % 2 !== 0) {
+        adjustedX -= BUBBLE_RADIUS; // 奇数行のオフセットを引く
+    }
+    
+    // 列の計算
+    let col = Math.round(adjustedX / BUBBLE_DIAMETER);
+    if (col < 0) col = 0;
+    if (col >= GRID_COLS) col = GRID_COLS - 1;
+
+    return { row: row, col: col };
+}
+// BUBBLE クラスに row と col を追加 (game.js内)
+class Bubble {
+    constructor(x, y, color, angle = 0, speed = 0, row = -1, col = -1) { // <-- 追加
+        this.x = x;
+        this.y = y;
+        this.radius = BUBBLE_RADIUS;
+        this.color = color;
+        this.vx = Math.cos(angle) * speed; 
+        this.vy = Math.sin(angle) * speed; 
+        this.isFixed = true; 
+        this.row = row; // <-- 追加
+        this.col = col; // <-- 追加
+    }
+    // ... (draw, updatePosition はそのまま) ...
+}
+
+
+// 初期配置関数
+function setupInitialBubbles() {
+    const initialRows = 5; // 最初は5行だけ配置
+    const colors = ['red', 'green', 'blue', 'yellow', 'purple'];
+    
+    for (let r = 0; r < initialRows; r++) {
+        for (let c = 0; c < GRID_COLS; c++) {
+            // ランダムな色を選択
+            const randomColor = colors[Math.floor(Math.random() * colors.length)];
+            
+            // ピクセル座標を取得
+            const { x, y } = getPixelCoords(r, c);
+
+            // バブルインスタンスを作成
+            const newBubble = new Bubble(x, y, randomColor, 0, 0, r, c);
+            
+            // グリッドと、全体のバブルリスト両方に追加
+            grid[r][c] = newBubble;
+            bubbles.push(newBubble); 
+        }
+    }
+}
+
+// draw 関数内の修正 (バブルは grid と currentBubble のみ描画すれば良い)
+function draw() {
+    // 1. 固定バブルを描画 (gridから取得)
+    for (let r = 0; r < GRID_ROWS; r++) {
+        for (let c = 0; c < GRID_COLS; c++) {
+            if (grid[r][c] !== null) {
+                grid[r][c].draw();
+            }
+        }
+    }
+
+    // 2. 発射中のバブルを描画
+    if (currentBubble) {
+        currentBubble.draw();
+    }
+    
+    // 3. ランチャーを描画
+    // ... (既存のランチャー描画コード) ...
+}
+
+// initializeGame() の呼び出しは game.js の最後で行う
+// initializeGame();
+// gameLoop();
